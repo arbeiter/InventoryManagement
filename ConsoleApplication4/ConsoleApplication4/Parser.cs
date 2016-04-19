@@ -14,8 +14,30 @@ namespace ConsoleApplication4
 {
     public class Parser
     {
-        public string PrettyPrint()
+        public string PrettyPrint(string Source)
         {
+            try
+            {
+                var CDs = this.GetLongCDs(Source);
+                var CDJson = JsonConvert.SerializeObject(CDs.ToString());
+                Console.WriteLine(CDJson);
+
+                var AuthorsWithCDs = this.GetAuthorsWithCds(Source);
+                var AuthorsWithCDsJson = JsonConvert.SerializeObject(AuthorsWithCDs.ToString());
+                Console.WriteLine(AuthorsWithCDsJson);
+
+                var TopResults = this.GetTopResults(Source);
+                var TopResultsJson = JsonConvert.SerializeObject(TopResults);
+                Console.WriteLine("Authors with top results are " + TopResultsJson.ToString());
+
+                var ItemsWithYearName = this.GetItemsWithYearName(Source);
+                var ItemsWithYearNameJson = JsonConvert.SerializeObject(ItemsWithYearName);
+                Console.WriteLine("Authors with top results are " + ItemsWithYearNameJson.ToString());
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("There was an error while processing your input", e);
+            }
             return String.Empty;
         }
 
@@ -29,35 +51,43 @@ namespace ConsoleApplication4
                 Query = new StrongBox<IEnumerable>()
             };
 
-            model.Query.Value = from dynamic item in model.Result
-                                where this.IsKeyValid(item, "type") && item.type.ToString().Equals("cd")
-                                select item;
-
             Dictionary<string, string> cds = new Dictionary<string, string>();
-            foreach (dynamic cd in model.Query.Value)
-            {
-                //Check whether cd contains tracks
-                if (this.IsKeyValid(cd, "tracks")==false)
-                {
-                    continue;
-                }
 
-                if (cd.tracks != null)
+            try
+            {
+                model.Query.Value = from dynamic item in model.Result
+                                    where this.IsKeyValid(item, "type") && item.type.ToString().Equals("cd")
+                                    select item;
+
+                foreach (dynamic cd in model.Query.Value)
                 {
-                    int total = 0;
-                    foreach (dynamic track in cd.tracks)
+                    //Check whether cd contains tracks
+                    if (this.IsKeyValid(cd, "tracks") == false)
                     {
-                        if (track.seconds != null)
+                        continue;
+                    }
+
+                    if (cd.tracks != null)
+                    {
+                        int total = 0;
+                        foreach (dynamic track in cd.tracks)
                         {
-                            total += track.seconds;
+                            if (track.seconds != null)
+                            {
+                                total += track.seconds;
+                            }
+                        }
+
+                        if (total > (60 * 60))
+                        {
+                            cds.Add(cd.title, total.ToString());
                         }
                     }
-
-                    if (total > (60 * 60))
-                    {
-                        cds.Add(cd.title, total.ToString());
-                    }
                 }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception with Get Long CDs", e);
             }
 
             return cds;
@@ -73,19 +103,26 @@ namespace ConsoleApplication4
                 Query = new StrongBox<IEnumerable>()
             };
 
-            model.Query.Value = from dynamic item in model.Result
-                                where this.IsKeyValid(item, "type") && item.type.ToString().Equals("cd")
-                                select item;
-
-            var res = model.Query.Value;
-
             HashSet<string> val = new HashSet<string>();
-            foreach (dynamic value in res)
+            try
             {
-                if (value.author != null)
+                model.Query.Value = from dynamic item in model.Result
+                                    where this.IsKeyValid(item, "type") && item.type.ToString().Equals("cd")
+                                    select item;
+
+                var res = model.Query.Value;
+
+                foreach (dynamic value in res)
                 {
-                    val.Add(value.author.ToString());
+                    if (value.author != null)
+                    {
+                        val.Add(value.author.ToString());
+                    }
                 }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Error with get author cds" + e.ToString());
             }
 
             return val.ToList();
@@ -110,34 +147,41 @@ namespace ConsoleApplication4
 
             //Step 2 : Construct a strongly typed dictionary with Key of type string and Items of type List<String>
             Dictionary<string, List<string>> outputDict = new Dictionary<string, List<string>>();
-            foreach (dynamic item in model.Query.Value)
+            try
             {
-                var out1 = item.ItemType;
-                if (out1 == null)
+                foreach (dynamic item in model.Query.Value)
                 {
-                    continue;
-                }
-
-                List<String> prices = new List<string>();
-                foreach (dynamic boxer in item.Items)
-                {
-                    if (this.IsKeyValid(boxer, "price"))
+                    var out1 = item.ItemType;
+                    if (out1 == null)
                     {
-                        prices.Add(boxer.price.ToString());
+                        continue;
                     }
+
+                    List<String> prices = new List<string>();
+                    foreach (dynamic boxer in item.Items)
+                    {
+                        if (this.IsKeyValid(boxer, "price"))
+                        {
+                            prices.Add(boxer.price.ToString());
+                        }
+                    }
+
+                    outputDict.Add(out1.ToString(), prices);
                 }
 
-                outputDict.Add(out1.ToString(), prices);
+                //Step 3 : Perform a  LINQ query on the output dictionary's values and pick the top 5 elements from them
+                // The result is a transformed dictionary
+                // You can't do it in the same loop because C# doesn't allow you to modify a collection while you loop over it.
+                List<string> keys = new List<string>(outputDict.Keys);
+                foreach (var input in keys)
+                {
+                    var result = outputDict[input].OrderByDescending(x => Double.Parse(x)).Take(5).ToList();
+                    outputDict[input] = result;
+                }
             }
-
-            //Step 3 : Perform a  LINQ query on the output dictionary's values and pick the top 5 elements from them
-            // The result is a transformed dictionary
-            // You can't do it in the same loop because C# doesn't allow you to modify a collection while you loop over it.
-            List<string> keys = new List<string>(outputDict.Keys);
-            foreach (var input in keys)
+            catch (Exception e)
             {
-                var result = outputDict[input].OrderByDescending(x => Double.Parse(x)).Take(5).ToList();
-                outputDict[input] = result;
+                Console.WriteLine("Error ", e);
             }
 
             return outputDict;
@@ -153,56 +197,63 @@ namespace ConsoleApplication4
                 Query = new StrongBox<IEnumerable>()
             };
 
-            model.Query.Value = from dynamic item in model.Result
-                                where this.IsKeyValid(item, "type")
-                                select item;
-
-            var res = model.Query.Value;
-
             HashSet<String> output = new HashSet<string>();
-            foreach (dynamic val in res)
+            try
             {
-                //Cast expando to object
-                object x = (object)val;
+                model.Query.Value = from dynamic item in model.Result
+                                    where this.IsKeyValid(item, "type")
+                                    select item;
 
-                //Title
-                if (this.IsKeyValid(val, "title"))
-                {
-                    if (val.title != null && this.IsYear(val.title.ToString()))
-                    {
-                        output.Add(val.title);
-                    }
-                }
+                var res = model.Query.Value;
 
-                //Track
-                if (this.IsKeyValid(val, "tracks"))
+                foreach (dynamic val in res)
                 {
-                    if (val.tracks != null)
+                    //Cast expando to object
+                    object x = (object)val;
+
+                    //Title
+                    if (this.IsKeyValid(val, "title"))
                     {
-                        foreach (dynamic track in val.tracks)
+                        if (val.title != null && this.IsYear(val.title.ToString()))
                         {
-                            if (this.IsYear(track.name.ToString()))
+                            output.Add(val.title);
+                        }
+                    }
+
+                    //Track
+                    if (this.IsKeyValid(val, "tracks"))
+                    {
+                        if (val.tracks != null)
+                        {
+                            foreach (dynamic track in val.tracks)
                             {
-                                output.Add(val.title);
+                                if (this.IsYear(track.name.ToString()))
+                                {
+                                    output.Add(val.title);
+                                }
+                            }
+                        }
+                    }
+
+                    if (this.IsKeyValid(val, "chapters"))
+                    {
+                        //Chapter
+                        if (val.chapters != null)
+                        {
+                            foreach (dynamic chapter in val.chapters)
+                            {
+                                if (this.IsYear(chapter.ToString()))
+                                {
+                                    output.Add(val.title);
+                                }
                             }
                         }
                     }
                 }
-
-                if (this.IsKeyValid(val, "chapters"))
-                {
-                    //Chapter
-                    if (val.chapters != null)
-                    {
-                        foreach (dynamic chapter in val.chapters)
-                        {
-                            if (this.IsYear(chapter.ToString()))
-                            {
-                                output.Add(val.title);
-                            }
-                        }
-                    }
-                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception with GetItemsWithYearName", e);
             }
 
             return output.ToList();
@@ -248,14 +299,14 @@ namespace ConsoleApplication4
             bool containsYears = false;
 
             string[] numbers = Regex.Split(input, @"\D+");
-            foreach(var number in numbers)
+            foreach (var number in numbers)
             {
 
                 if (!string.IsNullOrEmpty(number))
                 {
                     int i = int.Parse(number);
                     //Todo: Use gregorian calendar max. The whole date time validation thing.
-                    if (i>1 && i < 3000)
+                    if (i > 1 && i < 3000)
                     {
                         containsYears = containsYears || true;
                     }
