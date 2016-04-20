@@ -14,7 +14,6 @@ namespace ConsoleApplication4
 {
     public class Program
     {
-        const string Source = @"[{""price"":15.99,""chapters"":[""one"",""two"",""three""],""year"":1999,""title"":""foo"",""author"":""mary"",""type"":""book""},{""price"":11.99,""minutes"":90,""year"":2004,""title"":""bar"",""director"":""alan"",""type"":""dvd""},{""price"":15.99,""tracks"":[{""seconds"":180,""name"":""one""},{""seconds"":200,""name"":""two""}],""year"":2000,""title"":""baz"",""author"":""joan"",""type"":""cd""}]";
 
         static void Main(string[] args)
         {
@@ -26,10 +25,12 @@ namespace ConsoleApplication4
             Parser parser = new Parser();
             if (parser.IsValidJson(args[0]))
             {
-                parser.GetAuthorsWithCds(args[0]);
+                parser.PrettyPrint(args[0]);
             }
-
-            parser.PrettyPrint();
+            else
+            {
+                Console.WriteLine("Invalid Json");
+            }
         }
     }
 }
